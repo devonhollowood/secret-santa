@@ -1,6 +1,7 @@
 # project-specific ignores
 people.txt
 forbidden-pairs.txt
+secret_santa
 
 # standard Haskell ignores
 dist
