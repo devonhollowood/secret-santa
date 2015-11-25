@@ -1,3 +1,8 @@
+# project-specific ignores
+people.txt
+forbidden-pairs.txt
+
+# standard Haskell ignores
 dist
 cabal-dev
 *.o
