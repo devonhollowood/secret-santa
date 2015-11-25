@@ -1,15 +1,19 @@
 import Control.Monad.Random
 import Control.Monad (mzero)
 import Data.Csv hiding (Name)
-import Data.ByteString.Lazy as B
-import Data.Vector as V
+import qualified Data.ByteString.Lazy as B
+import qualified Data.Vector as V
+import System.Random.Shuffle
 import System.Exit (die)
+import Data.List (find)
 
 main = do
     people <- readPeopleFile "people.txt"
     forbidden_pairs <- readForbiddenPairsFile "forbidden-pairs.txt"
-    santas <- evalRandIO $ selectSantas people forbidden_pairs
-    sendEmails santas
+    maybe_santas <- evalRandIO $ selectSantas people forbidden_pairs
+    case maybe_santas of
+        Just santas -> sendEmails santas
+        Nothing -> die "Error: no valid pairings are possible!"
 
 {- Reads list of people from csv file `filename`.
  - Columns in `filename` should be [Name, Email]
@@ -34,11 +38,25 @@ readForbiddenPairsFile filename = do
 {- Takes raw csv file data, and returns either an error message or a list of
  - `a`s contained in the file data
  -}
-readCsv :: FromRecord a => ByteString -> Either String [a]
+readCsv :: FromRecord a => B.ByteString -> Either String [a]
 readCsv csv_data = V.toList <$> decode NoHeader csv_data
 
-selectSantas :: RandomGen g => [Person] -> [ForbiddenPair]  -> Rand g Santas
-selectSantas = undefined
+{- Randomly pairs people with a secret santa, rejecting any sets which contain
+ - forbidden pairs
+ -}
+selectSantas ::
+    RandomGen g => [Person] -> [ForbiddenPair] -> Rand g (Maybe Santas)
+selectSantas people forbidden =
+    enumeratePairs people >>= return . find (not . any is_forbidden)
+    where is_forbidden :: (Person, Person) -> Bool
+          is_forbidden (a, b) =
+              name a == name b ||
+              (name a, name b) `elem` forbidden ||
+              (name b, name a) `elem` forbidden
+
+enumeratePairs :: RandomGen g => [Person] -> Rand g [[(Person, Person)]]
+enumeratePairs people =
+    mapM shuffleM (repeat people) >>= return . map (zip people)
 
 sendEmails :: Santas -> IO ()
 sendEmails = undefined
