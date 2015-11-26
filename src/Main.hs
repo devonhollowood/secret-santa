@@ -54,13 +54,28 @@ selectSantas people forbidden =
               (name a, name b) `elem` forbidden ||
               (name b, name a) `elem` forbidden
 
+{- Generates an infinite list of lists of randomly-paired Persons from `people`
+ -}
 enumeratePairs :: RandomGen g => [Person] -> Rand g [[(Person, Person)]]
 enumeratePairs people =
-    mapM shuffleM (repeat people) >>= return . map (zip people)
+    mapM shuffleM (repeat people) >>= -- Create lists of shuffled people
+    return . map (zip people)         -- Pair them up with our ordered list
 
+{- Action which prints out the assignments, and nothing else
+ -}
+testSantas :: Santas -> IO ()
+testSantas = mapM_ (putStrLn . santaLine)
+    where santaLine (a, b) =
+              concat ["Assigned ", name a, " (", email a,
+                      ") their secret santa: ", name b]
+
+{- Action which sends out the emails
+ -}
 sendEmails :: Santas -> IO ()
 sendEmails = undefined
 
+{- Type declarations
+ -}
 type FileName = String
 type Name = String
 type Email = String
