@@ -1,3 +1,4 @@
+import Options.Applicative as Opt
 import Control.Monad.Random
 import Control.Monad (mzero)
 import Data.Csv hiding (Name)
@@ -6,13 +7,18 @@ import qualified Data.Vector as V
 import System.Random.Shuffle
 import System.Exit (die)
 import Data.List (find)
+import Data.Maybe (maybeToList)
 
 main = do
-    people <- readPeopleFile "people.txt"
-    forbidden_pairs <- readForbiddenPairsFile "forbidden-pairs.txt"
+    opts <- execParser parseOpts
+    people <- readPeopleFile (peopleFile opts)
+    forbidden_pairs <- maybe
+                      (return [])
+                      readForbiddenPairsFile
+                      (forbiddenPairsFile opts)
     maybe_santas <- evalRandIO $ selectSantas people forbidden_pairs
     case maybe_santas of
-        Just santas -> sendEmails santas
+        Just santas -> (santaAction opts) santas
         Nothing -> die "Error: no valid pairings are possible!"
 
 {- Reads list of people from csv file `filename`.
@@ -92,3 +98,45 @@ instance FromRecord Person where
     parseRecord record
         | V.length record == 2 = Person <$> record .! 0 <*> record .! 1
         | otherwise = mzero
+
+{- Boring command line parsing stuff
+ -}
+data Options = Options {
+    santaAction :: Santas -> IO (),
+    peopleFile :: FileName,
+    forbiddenPairsFile :: Maybe FileName
+}
+
+parseOpts :: ParserInfo Options
+parseOpts = info (helper <*> options)
+            (  fullDesc
+            <> progDesc "generate and assign secret santa pairings"
+            <> Opt.header "secret-santa: a tool to run secret santa pairings"
+            )
+
+options :: Opt.Parser Options
+options = Options
+          <$> subparser (
+                  command "test" (
+                      info (pure testSantas) (progDesc
+                      "assign secret santa pairings, but do not send emails")
+                  )
+               <> command "execute" (
+                      info (pure sendEmails) (progDesc
+                      "assign secret santa pairings and email assignments")
+                  )
+               <> help "choose command to execute"
+              )
+          <*> strArgument (
+                  metavar "PEOPLE"
+               <> help "CSV file containing two columns: [Name, Email]"
+              )
+          <*> (optional $
+                  strOption (
+                  long "forbidden-pairs"
+                  <> short 'x'
+                  <> metavar "FORBIDDENPAIRS"
+                  <> help "CSV file containing forbidden pairs in format \
+                          \[Name, Name]"
+                  )
+              )
