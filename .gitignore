@@ -1,6 +1,6 @@
 # project-specific ignores
-people.txt
-forbidden-pairs.txt
+*.csv
+!examples/*
 secret_santa
 
 # standard Haskell ignores
