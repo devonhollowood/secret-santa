@@ -1,6 +1,6 @@
 import Options.Applicative as Opt
 import Control.Monad.Random
-import Control.Monad (mzero)
+import Control.Monad (mzero, liftM)
 import Data.Csv hiding (Name)
 import qualified Data.ByteString.Lazy as B
 import qualified Data.Vector as V
@@ -18,7 +18,7 @@ main = do
                       (forbiddenPairsFile opts)
     maybe_santas <- evalRandIO $ selectSantas people forbidden_pairs
     case maybe_santas of
-        Just santas -> (santaAction opts) santas
+        Just santas -> santaAction opts santas
         Nothing -> die "Error: no valid pairings are possible!"
 
 {- Reads list of people from csv file `filename`.
@@ -53,7 +53,9 @@ readCsv csv_data = V.toList <$> decode NoHeader csv_data
 selectSantas ::
     RandomGen g => [Person] -> [ForbiddenPair] -> Rand g (Maybe Santas)
 selectSantas people forbidden =
-    enumeratePairs people >>= return . find (not . any is_forbidden)
+    liftM                            -- Do in the Rand g Monad
+    (find $ not . any is_forbidden)  -- Pick first list with no forbidden pairs
+    (generatePairs people)          -- From an infinite list of lists of pairs
     where is_forbidden :: (Person, Person) -> Bool
           is_forbidden (a, b) =
               name a == name b ||
@@ -62,10 +64,11 @@ selectSantas people forbidden =
 
 {- Generates an infinite list of lists of randomly-paired Persons from `people`
  -}
-enumeratePairs :: RandomGen g => [Person] -> Rand g [[(Person, Person)]]
-enumeratePairs people =
-    mapM shuffleM (repeat people) >>= -- Create lists of shuffled people
-    return . map (zip people)         -- Pair them up with our ordered list
+generatePairs :: RandomGen g => [Person] -> Rand g [[(Person, Person)]]
+generatePairs people =
+    liftM                            -- Do in the Rand g Monad
+    (map $ zip people)               -- Pair up shuffled lists of people
+    (mapM shuffleM $ repeat people)  -- Create lists of shuffled people forever
 
 {- Action which prints out the assignments, and nothing else
  -}
@@ -115,28 +118,29 @@ parseOpts = info (helper <*> options)
             )
 
 options :: Opt.Parser Options
-options = Options
-          <$> subparser (
-                  command "test" (
-                      info (pure testSantas) (progDesc
-                      "assign secret santa pairings, but do not send emails")
-                  )
-               <> command "execute" (
-                      info (pure sendEmails) (progDesc
-                      "assign secret santa pairings and email assignments")
-                  )
-               <> help "choose command to execute"
-              )
-          <*> strArgument (
-                  metavar "PEOPLE"
-               <> help "CSV file containing two columns: [Name, Email]"
-              )
-          <*> (optional $
-                  strOption (
-                  long "forbidden-pairs"
-                  <> short 'x'
-                  <> metavar "FORBIDDENPAIRS"
-                  <> help "CSV file containing forbidden pairs in format \
-                          \[Name, Name]"
-                  )
-              )
+options =
+    Options
+    <$> subparser (
+            command "test" (
+                info (pure testSantas) (progDesc
+                "assign secret santa pairings, but do not send emails")
+            )
+         <> command "execute" (
+                info (pure sendEmails) (progDesc
+                "assign secret santa pairings and email assignments")
+            )
+         <> help "choose command to execute"
+        )
+    <*> strArgument (
+            metavar "PEOPLE"
+         <> help "CSV file containing two columns: [Name, Email]"
+        )
+    <*> optional (
+            strOption (
+            long "forbidden-pairs"
+            <> short 'x'
+            <> metavar "FORBIDDENPAIRS"
+            <> help "CSV file containing forbidden pairs in format \
+                    \[Name, Name]"
+            )
+        )
