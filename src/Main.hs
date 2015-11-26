@@ -1,10 +1,13 @@
+import qualified Network.HaskellNet.SMTP as SMTP
 import Options.Applicative as Opt
 import Control.Monad.Random
-import Control.Monad (mzero, liftM)
+import Control.Monad (mzero, liftM, unless)
 import Data.Csv hiding (Name)
 import qualified Data.ByteString.Lazy as B
 import qualified Data.Vector as V
+import qualified Data.Text.Lazy as T
 import System.Random.Shuffle
+import System.Directory (doesFileExist)
 import System.Exit (die)
 import Data.List (find)
 import Data.Maybe (maybeToList)
@@ -78,16 +81,69 @@ testSantas = mapM_ (putStrLn . santaLine)
               concat ["Assigned ", name a, " (", email a,
                       ") their secret santa: ", name b]
 
-{- Action which sends out the emails
+{- Action which sends out emails to the Santas in `santas`
  -}
 sendEmails :: Santas -> IO ()
-sendEmails = undefined
+sendEmails santas = do
+    (username, connection) <- connect -- Connect to server
+    doubleSendGuard -- Make sure we haven't already sent the emails
+    mapM_ (sendEmail connection username) santas -- Send the emails
+    SMTP.closeSMTP connection -- Close connection
+    writeFile doubleSendGuardFile "" -- Protect against future double-sends
+
+{- Sends a secret santa email to `gifter`, assigning them `giftee`
+ - `connection` is the SMTP connection to use
+ - `username` is the username to log in with
+ -}
+sendEmail :: SMTP.SMTPConnection -> UserName -> (Person, Person) -> IO ()
+sendEmail connection username (gifter, giftee) =
+    SMTP.sendPlainTextMail     -- Send email
+    (email gifter)             -- Recipient
+    (username ++ "@gmail.com") -- Sender
+    "Secret Santa (Shhh!)"     -- Subject
+    (T.pack $ unlines          -- Body
+        ["Hello" ++ name gifter ++ ",",
+         "Your secret santa giftee is " ++ name giftee,
+         "Get them something good!"
+        ]
+    )
+    connection                 -- SMTP Connection
+
+{- Connects to gmail, prompts for username and password, and returns
+ - the username (e.g. "devonhollowood") for the connection, as well as the
+ - connection itself
+ -}
+connect :: IO (UserName, SMTP.SMTPConnection)
+connect = do
+    username <- prompt "What is your gmail username?"
+    password <- prompt "What is your gmail password?"
+    connection <- SMTP.connectSMTPPort "smtp.gmail.com" 465
+    successful <- SMTP.authenticate SMTP.LOGIN username password connection
+    if successful
+        then return (username, connection)
+        else die "Authentication failed"
+    where prompt msg = putStrLn msg >> getLine
+
+{- Guards against accidentally sending the secret santa information twice
+ - by checking to see if the file `doubleSendGuardFile` already exists
+ -}
+doubleSendGuard :: IO ()
+doubleSendGuard = do
+    already_sent <- doesFileExist doubleSendGuardFile
+    unless already_sent $ die "Secret Santa emails already sent!"
+
+{- Filename for the already-sent file. Used to protect against accidentally
+ - sending out the emails twice
+ -}
+doubleSendGuardFile :: FileName
+doubleSendGuardFile = "already-sent.guard"
 
 {- Type declarations
  -}
 type FileName = String
 type Name = String
 type Email = String
+type UserName = String
 
 type Santas = [(Person, Person)]
 type ForbiddenPair = (Name, Name)
@@ -102,7 +158,9 @@ instance FromRecord Person where
         | V.length record == 2 = Person <$> record .! 0 <*> record .! 1
         | otherwise = mzero
 
-{- Boring command line parsing stuff
+{- Boring command line parsing stuff below this point! -}
+
+{- Datatype representing command-line options
  -}
 data Options = Options {
     santaAction :: Santas -> IO (),
@@ -110,6 +168,8 @@ data Options = Options {
     forbiddenPairsFile :: Maybe FileName
 }
 
+{- High-level program description
+ -}
 parseOpts :: ParserInfo Options
 parseOpts = info (helper <*> options)
             (  fullDesc
@@ -117,6 +177,8 @@ parseOpts = info (helper <*> options)
             <> Opt.header "secret-santa: a tool to run secret santa pairings"
             )
 
+{- Program option parsing
+ -}
 options :: Opt.Parser Options
 options =
     Options
