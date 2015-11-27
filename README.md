@@ -8,8 +8,8 @@ Once you have `Stack`, do the following to build `secret-santa`:
 
 1. Clone this repository: Navigate to where you want the files to be, and type `git clone git@github.com:devonhollowood/secret-santa.git`.
 1. Change directories to `secret-santa`: Type `cd secret-santa`.
-1. Build `secret-santa` using `Stack`: Type `stack build`. It may take a minute or two to download and build the dependencies.
-1. You have now built `secret-santa`!
+1. Build `secret-santa` using `Stack`: Type `stack build`. It may take a minute or two to download and build the dependencies. You may be prompted to run `stack setup` first. If this occurs, do so and then re-run `stack build`.
+1. You have now built `secret-santa`! `Stack` will tell you where it put the executable. You can either use that, or use `stack exec` as documented below.
 
 You will also need a gmail account if you would like to have to program email matches.
 
