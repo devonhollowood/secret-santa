@@ -192,16 +192,17 @@ options =
                 "assign secret santa pairings and email assignments")
             )
          <> help "choose command to execute"
+         <> metavar "<command>"
         )
     <*> strArgument (
-            metavar "PEOPLE"
+            metavar "<people file>"
          <> help "CSV file containing two columns: [Name, Email]"
         )
     <*> optional (
             strOption (
             long "forbidden-pairs"
             <> short 'x'
-            <> metavar "FORBIDDENPAIRS"
+            <> metavar "<forbidden pairs file>"
             <> help "CSV file containing forbidden pairs in format \
                     \[Name, Name]"
             )
