@@ -1,7 +1,7 @@
 # project-specific ignores
 *.csv
 !examples/*
-secret_santa
+already-sent.guard
 
 # standard Haskell ignores
 dist
