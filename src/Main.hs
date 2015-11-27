@@ -1,7 +1,7 @@
 import qualified Network.HaskellNet.SMTP as SMTP
 import Options.Applicative as Opt
 import Control.Monad.Random
-import Control.Monad (mzero, liftM, unless)
+import Control.Monad (mzero, liftM, when)
 import Data.Csv hiding (Name)
 import qualified Data.ByteString.Lazy as B
 import qualified Data.Vector as V
@@ -130,7 +130,7 @@ connect = do
 doubleSendGuard :: IO ()
 doubleSendGuard = do
     already_sent <- doesFileExist doubleSendGuardFile
-    unless already_sent $ die "Secret Santa emails already sent!"
+    when already_sent $ die "Secret Santa emails already sent!"
 
 {- Filename for the already-sent file. Used to protect against accidentally
  - sending out the emails twice
