@@ -87,7 +87,9 @@ sendEmails :: Santas -> IO ()
 sendEmails santas = do
     (username, connection) <- connect -- Connect to server
     doubleSendGuard -- Make sure we haven't already sent the emails
+    putStrLn "Sending emails..."
     mapM_ (sendEmail connection username) santas -- Send the emails
+    putStrLn "\t...success!"
     SMTP.closeSMTP connection -- Close connection
     writeFile doubleSendGuardFile "" -- Protect against future double-sends
 
@@ -117,10 +119,13 @@ connect :: IO (UserName, SMTP.SMTPConnection)
 connect = do
     username <- prompt "What is your gmail username?"
     password <- prompt "What is your gmail password?"
-    connection <- SMTP.connectSMTPPort "smtp.gmail.com" 465
-    successful <- SMTP.authenticate SMTP.LOGIN username password connection
+    putStrLn "Connecting..."
+    connection <- SMTP.connectSMTPPort "smtp.gmail.com" 587
+    putStrLn "\t...success!"
+    putStrLn "Authenticating..."
+    successful <- SMTP.authenticate SMTP.PLAIN username password connection
     if successful
-        then return (username, connection)
+        then putStrLn "\t...success!" >> return (username, connection)
         else die "Authentication failed"
     where prompt msg = putStrLn msg >> getLine
 
