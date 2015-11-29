@@ -23,7 +23,7 @@ main = do
     maybe_santas <- evalRandIO $ selectSantas people forbidden_pairs
     case maybe_santas of
         Just santas -> santaAction opts santas
-        Nothing -> die "Error: no valid pairings are possible!"
+        Nothing -> die "Error: no valid pairings found!"
 
 {- Reads list of people from csv file `filename`.
  - Columns in `filename` should be [Name, Email]
@@ -57,9 +57,9 @@ readCsv csv_data = V.toList <$> decode NoHeader csv_data
 selectSantas ::
     RandomGen g => [Person] -> [ForbiddenPair] -> Rand g (Maybe Santas)
 selectSantas people forbidden =
-    liftM                            -- Do in the Rand g Monad
-    (find $ not . any is_forbidden)  -- Pick first list with no forbidden pairs
-    (generatePairs people)          -- From an infinite list of lists of pairs
+    liftM                                       -- Do in the Rand g Monad
+    (find (not . any is_forbidden) . take 1000) -- Pick first non-forbidden list
+    (generatePairs people)                      -- From 1000 shuffled lists
     where is_forbidden :: (Person, Person) -> Bool
           is_forbidden (a, b) =
               name a == name b ||
@@ -100,13 +100,14 @@ sendEmails santas = SMTP.doSMTPSTARTTLS "smtp.gmail.com" $ \connection -> do
 sendEmail :: SMTP.SMTPConnection -> Name -> UserName -> (Person, Person)
              -> IO ()
 sendEmail connection from username (gifter, giftee) =
+    putStrLn ("\t...sending to " ++ email gifter ++ "...") >>
     SMTP.sendPlainTextMail     -- Send email
     (email gifter)             -- Recipient
     (username ++ "@gmail.com") -- Sender
     "Secret Santa (Shhh!)"     -- Subject
     (T.pack $ unlines          -- Body
         ["Hello " ++ name gifter ++ ",",
-         "Your secret santa giftee is " ++ name giftee,
+         "Your secret santa giftee is " ++ name giftee ++ ".",
          "Get them something good!"
         ]
     )
