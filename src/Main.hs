@@ -1,4 +1,4 @@
-import qualified Network.HaskellNet.SMTP as SMTP
+import qualified Network.HaskellNet.SMTP.SSL as SMTP
 import Options.Applicative as Opt
 import Control.Monad.Random
 import Control.Monad (mzero, liftM, when)
@@ -9,6 +9,7 @@ import qualified Data.Text.Lazy as T
 import System.Random.Shuffle
 import System.Directory (doesFileExist)
 import System.Exit (die)
+import System.IO (hFlush, stdout)
 import Data.List (find)
 import Data.Maybe (maybeToList)
 
@@ -84,50 +85,47 @@ testSantas = mapM_ (putStrLn . santaLine)
 {- Action which sends out emails to the Santas in `santas`
  -}
 sendEmails :: Santas -> IO ()
-sendEmails santas = do
-    (username, connection) <- connect -- Connect to server
+sendEmails santas = SMTP.doSMTPSTARTTLS "smtp.gmail.com" $ \connection -> do
     doubleSendGuard -- Make sure we haven't already sent the emails
+    (from, username) <- authenticate connection -- Connect to server
     putStrLn "Sending emails..."
-    mapM_ (sendEmail connection username) santas -- Send the emails
+    mapM_ (sendEmail connection from username) santas -- Send the emails
     putStrLn "\t...success!"
-    SMTP.closeSMTP connection -- Close connection
     writeFile doubleSendGuardFile "" -- Protect against future double-sends
 
 {- Sends a secret santa email to `gifter`, assigning them `giftee`
  - `connection` is the SMTP connection to use
  - `username` is the username to log in with
  -}
-sendEmail :: SMTP.SMTPConnection -> UserName -> (Person, Person) -> IO ()
-sendEmail connection username (gifter, giftee) =
+sendEmail :: SMTP.SMTPConnection -> Name -> UserName -> (Person, Person)
+             -> IO ()
+sendEmail connection from username (gifter, giftee) =
     SMTP.sendPlainTextMail     -- Send email
     (email gifter)             -- Recipient
     (username ++ "@gmail.com") -- Sender
     "Secret Santa (Shhh!)"     -- Subject
     (T.pack $ unlines          -- Body
-        ["Hello" ++ name gifter ++ ",",
+        ["Hello " ++ name gifter ++ ",",
          "Your secret santa giftee is " ++ name giftee,
          "Get them something good!"
         ]
     )
     connection                 -- SMTP Connection
 
-{- Connects to gmail, prompts for username and password, and returns
- - the username (e.g. "devonhollowood") for the connection, as well as the
- - connection itself
+{- Prompts for username and password, and authenticates. Returns the username
+ - (e.g. "devonhollowood") for the connection, as well as the
  -}
-connect :: IO (UserName, SMTP.SMTPConnection)
-connect = do
+authenticate :: SMTP.SMTPConnection -> IO (Name, UserName)
+authenticate connection = do
+    from <- prompt "What is your name? (for the \"from\" field)"
     username <- prompt "What is your gmail username?"
     password <- prompt "What is your gmail password?"
-    putStrLn "Connecting..."
-    connection <- SMTP.connectSMTPPort "smtp.gmail.com" 587
-    putStrLn "\t...success!"
     putStrLn "Authenticating..."
     successful <- SMTP.authenticate SMTP.PLAIN username password connection
     if successful
-        then putStrLn "\t...success!" >> return (username, connection)
+        then putStrLn "\t...success!" >> return (from, username)
         else die "Authentication failed"
-    where prompt msg = putStrLn msg >> getLine
+    where prompt msg = putStr (msg ++ " ") >> hFlush stdout >> getLine
 
 {- Guards against accidentally sending the secret santa information twice
  - by checking to see if the file `doubleSendGuardFile` already exists
