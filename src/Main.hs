@@ -1,6 +1,6 @@
 import qualified Network.HaskellNet.SMTP.SSL as SMTP
 import Options.Applicative as Opt
-import Control.Monad.Random
+import Control.Monad.Random (evalRandIO, RandomGen, Rand)
 import Control.Monad (mzero, liftM, when)
 import qualified Data.Csv as Csv
 import Data.Csv ((.!))
@@ -109,7 +109,7 @@ sendEmail connection from (gifter, giftee) =
     (T.pack $ unlines           -- Body
         ["Hello " ++ name gifter ++ ",",
          "Your secret santa giftee is " ++ name giftee ++ ".",
-         "Get them something good!"
+         "Get them something good! 🎅🎄🎁"
         ]
     )
     connection                  -- SMTP Connection
