@@ -14,15 +14,18 @@ Once you have `Stack`, do the following to build `secret-santa`:
 You will also need a gmail account if you would like to have to program email matches.
 
 ## Running
-`secret-santa` has two modes:
+`secret-santa` has three modes:
 
-* The `test` mode will assign secret santas, but will just print them to the command line. This is useful for making sure that you have everything configured correctly. These assignments are not saved anywhere, and are fresh each time.
+* The `test-assignments` mode will assign secret santas, but will just print the assigned pairs to the command line. This is useful for making sure that you have everything configured correctly. These assignments are not saved anywhere, and are fresh each time.
+* The `test-emails` is similar to the `test-assignments` mode, but will additionally print out what the emails would look like. This is useful if you want to preview things fully.
 * The `execute` mode will assign secret santas, and email them through your gmail account. It will prompt you for your gmail username (e.g. `devonhollowood`) and password before emailing. It will then create a file, `already-sent.guard`, the existance of which is checked before sending future emails. This helps prevent accidental double-sends. In order to send again, delete this file.
 
 To run the program, type `stack exec -- secret-santa <mode> <people file>`, where `<mode>` is either `test` or `execute` (documented above), and `<people file>` is a csv file containing a list of people and their email addresses.
 
-You may also supply an optional argument, `--forbidden-pairs <forbidden pairs file>`, where `<forbidden pairs file> is a csv file containing a list of people who may not be paired (perhaps they are best friends or dating, and were planning on getting each other gifts anyways). This argument may be abbreviated `-x <forbidden pairs file>`.
+Optional arguments:
+* `--forbidden-pairs <forbidden pairs file>`, where `<forbidden pairs file>` is a csv file containing a list of people who may not be paired (perhaps they are best friends or dating, and were planning on getting each other gifts anyways). This argument may be abbreviated `-x <forbidden pairs file>`.
+* `--mailing-addresses <mailing addresses file>`, where `--mailing-addresses <mailing addresses file>` is a csv file containing a list of people and their mailing addresses. This is useful if organizing a secret santa by mail. This argument may be abbreviated `-m <mailing addresses file>`.
 
-Examples of `<people file>` and `<forbidden pairs file>` maybe be found in the `examples/` directory.
+Examples of `<people file>`, `<forbidden pairs file>`, and `<mailing addresses file>` maybe be found in the `examples/` directory.
 
 ## Enjoy, and get each other good stuff!
