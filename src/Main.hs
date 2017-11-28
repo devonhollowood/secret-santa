@@ -2,6 +2,7 @@ import qualified Network.HaskellNet.SMTP.SSL as SMTP
 import Options.Applicative as Opt
 import Control.Monad.Random (evalRandIO, RandomGen, Rand)
 import Control.Monad (mzero, when)
+import Data.Monoid ((<>))
 import qualified Data.Csv as Csv
 import Data.Csv ((.!))
 import qualified Data.ByteString.Lazy as B
