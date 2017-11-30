@@ -31,7 +31,7 @@ main = do
         selectSantas people forbidden_pairs
     case maybe_santas of                       -- Perform action chosen at
         Just santas ->                         -- command line if possible
-            santaAction opts addresses santas
+            santaAction opts (emailInfo opts) addresses santas
         Nothing -> die "Error: no valid pairings found!"
 
 {- Reads list of people from csv file `filename`.
@@ -95,40 +95,37 @@ generatePairs people =
 {- Action which prints out the assignments, and nothing else
  -}
 testSantas :: Action
-testSantas _ = mapM_ (putStrLn . santaLine) -- Print out line for each pairing
+testSantas _ _ = mapM_ (putStrLn . santaLine) -- Print out line for each pairing
     where santaLine (a, b) =
               concat ["Assigned ", name a, " (", email a,
                       ") their secret santa: ", name b]
 {- Action which displays sample contents of emails
 -}
 testEmails :: Action
-testEmails addresses santas = do
-    from <- prompt "What is your name? (used in the \"from\" field)"
-    mapM_ (fakeEmails addresses from) santas
+testEmails email_info addresses = mapM_ (fakeEmails addresses email_info)
 
 {- Displays example secret santa email to `gifter`, assigning them `giftee`
  - `from` is what to use in the "Sender" field
  -}
-fakeEmails :: MailingAddressBook -> Name -> (Person, Person) -> IO ()
-fakeEmails addresses from (gifter, giftee) = do
+fakeEmails :: MailingAddressBook -> EmailInfo -> (Person, Person) -> IO ()
+fakeEmails addresses email_info (gifter, giftee) = do
     putStrLn $ name gifter ++ "'s email would say:"
     putStrLn . indent $ unlines [
         "To: " ++ email gifter,
-        "From: " ++ from,
-        "Subject: Secret Santa (Shhh!)",
+        "From: " ++ emailFrom email_info,
+        "Subject: " ++ emailSubject email_info,
         emailBody addresses (gifter, giftee)
         ]
 
 {- Action which sends out emails to the Santas in `santas`
  -}
 sendEmails :: Action
-sendEmails addresses santas =
+sendEmails email_info addresses santas =
     SMTP.doSMTPSTARTTLS "smtp.gmail.com" $ \connection -> do
         doubleSendGuard -- Make sure we haven't already sent the emails
-        from <- prompt "What is your name? (used in the \"from\" field)"
         authenticate connection -- Connect to server
         putStrLn "Sending emails..."
-        mapM_ (sendEmail connection addresses from) santas -- Send the emails
+        mapM_ (sendEmail connection addresses email_info) santas -- Send the emails
         putStrLn "\t...success!"
         writeFile doubleSendGuardFile "" -- Protect against future double-sends
 
@@ -139,15 +136,15 @@ sendEmails addresses santas =
 sendEmail ::
     SMTP.SMTPConnection
     -> MailingAddressBook
-    -> Name
+    -> EmailInfo
     -> (Person, Person)
     -> IO ()
-sendEmail connection addresses from (gifter, giftee) = do
+sendEmail connection addresses email_info (gifter, giftee) = do
     putStrLn $ "\t...sending to " ++ name gifter ++ " (" ++ email gifter ++ ")..."
     SMTP.sendPlainTextMail -- Send email
         (email gifter) -- Recipient
-        from -- Sender
-        "Secret Santa (Shhh!)" -- Subject
+        (emailFrom email_info) -- Sender
+        (emailSubject email_info) -- Subject
         (T.pack $ emailBody addresses (gifter, giftee)) -- Body
         connection -- SMTP Connection
 
@@ -206,11 +203,17 @@ indent string = '\t': indent' string
 type FileName = String
 type Name = String
 type Email = String
+type SubjectLine = String
 type MailingAddress = String
 type ForbiddenPair = (Name, Name)
 type Santas = [(Person, Person)]
-type Action = MailingAddressBook -> Santas -> IO ()
+type Action = EmailInfo -> MailingAddressBook -> Santas -> IO ()
 type MailingAddressBook = Map.Map Name MailingAddress
+
+data EmailInfo = EmailInfo {
+    emailFrom :: Name,
+    emailSubject :: SubjectLine
+}
 
 data Person = Person {
     name :: Name,
@@ -233,7 +236,8 @@ data Options = Options {
     santaAction :: Action,
     peopleFile :: FileName,
     forbiddenPairsFile :: Maybe FileName,
-    mailingAddressFile :: Maybe FileName
+    mailingAddressFile :: Maybe FileName,
+    emailInfo :: EmailInfo
 }
 
 {- High-level program description
@@ -286,5 +290,23 @@ options =
             <> metavar "<mailing addresses file>"
             <> help "CSV file containing mailing addresses in format \
                     \[Name, Address]"
+            )
+        )
+    <*> (EmailInfo
+        <$> strOption (
+            long "from"
+            <> short 'F'
+            <> metavar "<name>"
+            <> help "name used in email \"From\" field"
+            <> value "Santa Claus"
+            <> showDefault
+            )
+        <*> strOption (
+            long "subject"
+            <> short 'S'
+            <> metavar "<subject line>"
+            <> help "email subject line"
+            <> value "Secret Santa (Shhh!)"
+            <> showDefault
             )
         )
